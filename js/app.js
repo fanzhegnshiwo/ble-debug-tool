@@ -181,6 +181,12 @@ async function connectSelected() {
     device = dev;
     server = await dev.gatt.connect();
     device = dev;
+    const svcCount = await discoverServices();
+    // 没有任何 GATT 服务 -> 视为不可用/不支持
+    if (svcCount === 0) {
+      await dev.gatt.disconnect().catch(() => {});
+      throw new Error('该设备无可用的 GATT 服务');
+    }
     setPill('connected', '已连接');
     renderAdvertisement(dev);
     $('deviceInfo').textContent = `${connectedName}  ·  id:${connectedId.slice(0, 8)}`;
@@ -188,11 +194,14 @@ async function connectSelected() {
     $('metaLabel').textContent = '浏览器负责 MTU 协商';
     setConnUI(true);
     appendLog('sys', `连接成功：${connectedName} (${connectedId.slice(0, 12)}…)`);
-    await discoverServices();
     dev.addEventListener('gattserverdisconnected', onDisconnected);
   } catch (err) {
-    appendLog('err', '连接失败：' + (err.message || err.name));
+    // 连接失败 -> 视为未知/不支持的设备，自动过滤
+    pendingDevice = null;
+    $('selectedCard').classList.add('hidden');
     setPill('', '未连接');
+    appendLog('err', '所选设备不可用（未知或不支持），已过滤：' + (err.message || err.name));
+    toast('设备不可用，已过滤', true);
   }
 }
 
@@ -315,9 +324,11 @@ async function discoverServices() {
     renderSvcTree();
     fillProtoCharSelect();
     appendLog('sys', `已发现 ${servicesCache.length} 个服务`);
+    return servicesCache.length;
   } catch (err) {
     tree.innerHTML = `<div class="placeholder err">读取服务失败：${esc(err.message)}</div>`;
     appendLog('err', '读取 GATT 服务失败：' + err.message);
+    return 0;
   }
 }
 
