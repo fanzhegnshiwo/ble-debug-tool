@@ -63,8 +63,31 @@ npx serve .
 ## 项目结构
 
 ```
-├── index.html          # 页面结构
-├── css/style.css       # 样式（深色移动端主题）
-├── js/app.js           # 核心逻辑（Web Bluetooth）
+├── index.html               # 页面结构（ES Module 单入口）
+├── css/style.css            # 样式（深色移动端主题）
+├── js/
+│   ├── main.js              # 入口：页面流程编排 + 事件接线
+│   ├── device-filter.js     # 核心筛选器：蓝牙名称筛选 / 未知设备筛选 / 服务 UUID 筛选
+│   ├── ble-service.js       # 蓝牙服务层：全部 navigator.bluetooth 调用（扫描/连接/GATT）
+│   ├── ui.js                # UI 基础层：日志 / 吐司 / 状态 / 渲染
+│   ├── uart-panel.js        # UART 透传面板
+│   ├── protocol-panel.js    # 协议解析面板
+│   ├── protocol.js          # 协议解析引擎（纯函数）
+│   ├── codec.js             # 编解码：HEX / ASCII / UTF-8
+│   ├── names.js             # GATT UUID / 厂商名称表
+│   └── storage.js           # localStorage 持久化
 └── README.md
 ```
+
+### 设备筛选说明
+
+筛选逻辑统一收口在 `js/device-filter.js` 的 `DeviceFilter` 类：
+
+- **蓝牙名称筛选**：填「设备名称包含」关键字。系统选择框模式下受 Web Bluetooth
+  API 限制只能做前缀匹配；「极简列表」模式在客户端做「包含」匹配，更灵活。
+- **未知设备筛选**：勾选「只看有名称的设备」即可排除所有无名称设备。极简列表
+  直接不渲染；系统选择框无法预先隐藏，选中后会兜底校验并拒绝。
+- 连接失败或无 GATT 服务的设备会被自动过滤（视为未知/不支持设备）。
+
+> 注意：使用 ES Module，需通过 http(s) 访问（本地 `python -m http.server` 或部署到
+> GitHub Pages 均可），不能直接双击 index.html 用 file:// 协议打开。

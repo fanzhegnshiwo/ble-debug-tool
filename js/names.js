@@ -1,11 +1,11 @@
 /* ============================================================
- * GATT 常用 UUID 名称表 + 厂商/外观表（移植自桌面版 core.py）
+ * 名称表：GATT 常用 UUID 名称 + 厂商/外观表（数据层，纯查表）
  * ============================================================ */
 'use strict';
 
 const BASE_UUID_SUFFIX = '-0000-1000-8000-00805f9b34fb';
 
-const SERVICE_NAMES = {
+export const SERVICE_NAMES = {
   '0x1800': 'Generic Access', '0x1801': 'Generic Attribute', '0x1802': 'Immediate Alert',
   '0x1803': 'Link Loss', '0x1804': 'Tx Power', '0x1805': 'Current Time Service',
   '0x1806': 'Reference Time Update Service', '0x1807': 'Next DST Change Service',
@@ -32,7 +32,7 @@ const SERVICE_NAMES = {
   '0xFFE5': 'Nordic LED Button Service',
 };
 
-const CHAR_NAMES = {
+export const CHAR_NAMES = {
   '0x2A00': 'Device Name', '0x2A01': 'Appearance', '0x2A02': 'Peripheral Privacy Flag',
   '0x2A03': 'Reconnection Address', '0x2A04': 'Peripheral Preferred Connection Parameters',
   '0x2A05': 'Service Changed', '0x2A06': 'Alert Level', '0x2A07': 'Tx Power Level',
@@ -138,7 +138,7 @@ const CHAR_NAMES = {
   '0x2B24': 'Value Trigger State', '0x2B25': 'Value Trigger Description',
 };
 
-const DESCRIPTOR_NAMES = {
+export const DESCRIPTOR_NAMES = {
   '0x2900': 'Characteristic Extended Properties',
   '0x2901': 'Characteristic User Description',
   '0x2902': 'Client Characteristic Configuration',
@@ -154,7 +154,7 @@ const DESCRIPTOR_NAMES = {
   '0x2910': 'Complete LE Transport Block Data', '0x2911': 'Characteristic Summary',
 };
 
-const COMPANY_NAMES = {
+export const COMPANY_NAMES = {
   0x0000: 'Ericsson', 0x0001: 'Nokia', 0x0002: 'Intel', 0x0003: 'IBM', 0x0004: 'Toshiba',
   0x0005: '3Com', 0x0006: 'Microsoft', 0x0007: 'Lucent', 0x0008: 'Motorola', 0x000A: 'Qualcomm',
   0x000D: 'Texas Instruments', 0x000F: 'Broadcom', 0x0010: 'LSI', 0x0012: 'STMicroelectronics',
@@ -166,7 +166,7 @@ const COMPANY_NAMES = {
   0x0075: 'Huawei', 0x0087: 'Garmin', 0x00E0: 'Google', 0x0171: 'Amazon', 0x0175: 'Facebook',
 };
 
-const APPEARANCE_NAMES = {
+export const APPEARANCE_NAMES = {
   0x0000: 'Unknown', 0x0040: 'Generic Phone', 0x0080: 'Generic Computer',
   0x00C0: 'Generic Watch', 0x0100: 'Generic Clock', 0x0140: 'Generic Display',
   0x0180: 'Generic Remote Control', 0x01C0: 'Generic Eye-glasses', 0x0200: 'Generic Tag',
@@ -180,8 +180,8 @@ const APPEARANCE_NAMES = {
   0x1343: 'Cycling Speed Sensor', 0x1344: 'Cycling Cadence Sensor',
 };
 
-/* ---------- 工具函数 ---------- */
-function uuidTo16(uuid) {
+/* ---------- 查表工具 ---------- */
+export function uuidTo16(uuid) {
   const s = String(uuid || '').toLowerCase();
   if (s.length === 36 && s.endsWith(BASE_UUID_SUFFIX)) {
     const v = parseInt(s.slice(0, 8), 16);
@@ -190,7 +190,7 @@ function uuidTo16(uuid) {
   return null;
 }
 
-function shortUuid(uuid) {
+export function shortUuid(uuid) {
   const v = uuidTo16(uuid);
   if (v !== null) return v.toString(16).padStart(4, '0').toUpperCase();
   return String(uuid);
@@ -205,26 +205,21 @@ function nameFrom(map, uuid) {
   return map['0x' + hex] || map['0x' + hex.toUpperCase()] || '';
 }
 
-function serviceName(uuid) { return nameFrom(SERVICE_NAMES, uuid); }
-function characteristicName(uuid) { return nameFrom(CHAR_NAMES, uuid); }
-function descriptorName(uuid) { return nameFrom(DESCRIPTOR_NAMES, uuid); }
+export function serviceName(uuid) { return nameFrom(SERVICE_NAMES, uuid); }
+export function characteristicName(uuid) { return nameFrom(CHAR_NAMES, uuid); }
+export function descriptorName(uuid) { return nameFrom(DESCRIPTOR_NAMES, uuid); }
 
-function charLabel(uuid) {
+export function charLabel(uuid) {
   const n = characteristicName(uuid);
   if (n) return `${n} (${shortUuid(uuid)})`;
   return String(uuid);
 }
 
-function descLabel(uuid) {
+export function descLabel(uuid) {
   const n = descriptorName(uuid);
   if (n) return `${n} (${shortUuid(uuid)})`;
   return String(uuid);
 }
 
-function companyName(id) { return COMPANY_NAMES[id] || '未知厂商'; }
-function appearanceName(id) { return APPEARANCE_NAMES[id] || '未知'; }
-
-// 用于名字/短uuid搜索匹配（取 16 位 / 4 位 / 英文名 均可命中）
-function normalizeKeyword(text) {
-  return String(text || '').trim().toLowerCase();
-}
+export function companyName(id) { return COMPANY_NAMES[id] || '未知厂商'; }
+export function appearanceName(id) { return APPEARANCE_NAMES[id] || '未知'; }
