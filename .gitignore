@@ -1,0 +1,14 @@
+# 系统 / 依赖
+node_modules/
+.DS_Store
+Thumbs.db
+
+# 本地配置（含敏感信息，勿提交）
+config.local.json
+*.local
+.env
+.env.*
+
+# IDE / 编辑器
+.vscode/
+.idea/

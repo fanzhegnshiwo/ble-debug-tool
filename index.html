@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f19">
+  <title>BLE 蓝牙调试助手</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-top">
+      <h1>BLE 蓝牙调试助手</h1>
+      <span id="connStatus" class="conn-status">未连接</span>
+    </div>
+    <div class="header-actions">
+      <button id="btnConnect" class="btn primary">连接设备</button>
+      <button id="btnScan" class="btn hidden">扫描设备</button>
+      <button id="btnDisconnect" class="btn danger hidden">断开</button>
+    </div>
+  </header>
+
+  <!-- 不支持 Web Bluetooth 的提示 -->
+  <div id="unsupported" class="warn-banner hidden">
+    当前浏览器/系统不支持 Web Bluetooth。<strong>请在 Android 手机 Chrome/Edge 中打开。</strong> iOS Safari 不支持蓝牙。
+  </div>
+
+  <main class="app-main">
+    <!-- 设备信息条 -->
+    <section id="devicePanel" class="panel hidden">
+      <div class="panel-title">
+        <span>已连接设备</span>
+        <span id="deviceName" class="device-name"></span>
+      </div>
+      <div class="device-meta">
+        <span id="deviceRssi">RSSI: --</span>
+      </div>
+    </section>
+
+    <!-- 扫描面板 -->
+    <section id="scanPanel" class="panel hidden">
+      <div class="panel-title">
+        <span>附近设备</span>
+        <span class="scan-state" id="scanState"></span>
+      </div>
+      <div id="scanFilters" class="scan-filters">
+        <input id="filterUuid" type="text" placeholder="可选：服务 UUID 过滤，留空显示全部">
+      </div>
+      <ul id="deviceList" class="device-list"></ul>
+    </section>
+
+    <!-- 主功能区 Tabs -->
+    <nav id="tabs" class="tabs hidden">
+      <button data-tab="uart" class="tab active">透传</button>
+      <button data-tab="browse" class="tab">特征值</button>
+      <button data-tab="notify" class="tab">监听</button>
+      <button data-tab="log" class="tab">日志</button>
+    </nav>
+
+    <!-- UART 透传 -->
+    <section id="tab-uart" class="tab-content active">
+      <div class="panel">
+        <div class="panel-title"><span>UART 配置</span></div>
+        <div class="block-title">TX（写入/发送）设置</div>
+        <div class="field-row">
+          <label><span class="lbl">服务</span><input id="uartTxService" class="mono" placeholder="服务 UUID"></label>
+          <label><span class="lbl">特征值</span><input id="uartTxChar" class="mono" placeholder="特征值 UUID"></label>
+        </div>
+        <div class="block-title">RX（读取/接收）设置</div>
+        <div class="field-row">
+          <label><span class="lbl">服务</span><input id="uartRxService" class="mono" placeholder="服务 UUID"></label>
+          <label><span class="lbl">特征值</span><input id="uartRxChar" class="mono" placeholder="特征值 UUID"></label>
+        </div>
+        <button id="btnSaveUart" class="btn small">保存配置</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span>接收数据</span><button id="btnClearRx" class="btn small ghost">清空</button></div>
+        <pre id="rxLog" class="rx-log"></pre>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span>发送数据</span></div>
+        <div class="seg" id="modeSeg">
+          <button data-mode="text" class="seg-btn active">文本</button>
+          <button data-mode="hex" class="seg-btn">HEX</button>
+        </div>
+        <div class="send-row">
+          <textarea id="sendInput" class="send-input mono" placeholder="输入要发送的内容（文本或 HEX，如 01 02 A0 FF）"></textarea>
+          <button id="btnSend" class="btn primary">发送</button>
+        </div>
+        <div class="send-extras">
+          <label class="chk"><input type="checkbox" id="ckHex" checked> 十六进制显示</label>
+          <label class="chk"><input type="checkbox" id="ckTime" checked> 显示时间戳</label>
+          <label class="chk"><input type="checkbox" id="ckAutoScroll" checked> 自动滚动</label>
+        </div>
+      </div>
+    </section>
+
+    <!-- 服务/特征值浏览 -->
+    <section id="tab-browse" class="tab-content">
+      <div class="panel">
+        <div class="panel-title"><span>GATT 服务</span><button id="btnRefreshServices" class="btn small ghost">刷新</button></div>
+        <div id="servicesTree" class="services-tree">
+          <div class="empty-tip">连接设备后自动加载，可读取/写入特征值。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 通知监听 -->
+    <section id="tab-notify" class="tab-content">
+      <div class="panel">
+        <div class="panel-title"><span>通知监听</span><button id="btnClearNotify" class="btn small ghost">清空</button></div>
+        <div id="notifyLog" class="rx-log"></div>
+      </div>
+    </section>
+
+    <!-- 日志 -->
+    <section id="tab-log" class="tab-content">
+      <div class="panel">
+        <div class="panel-title"><span>系统日志</span><button id="btnClearLog" class="btn small ghost">清空</button></div>
+        <pre id="sysLog" class="rx-log"></pre>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
