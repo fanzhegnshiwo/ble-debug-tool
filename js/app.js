@@ -285,11 +285,13 @@ async function scanMini() {
   const list = $('miniList');
 
   if (!navigator.bluetooth.requestLEScan) {
-    toast('当前浏览器不支持实验扫描接口，已切回系统列表', true);
     searchMode = 'system';
     syncSearchModeUI();
     list.classList.add('hidden');
-    appendLog('err', '极简列表不可用（浏览器不支持 requestLEScan），已自动切回「系统列表」模式，即将用系统选择框搜索。');
+    toast('极简列表需开启实验开关，已切回系统列表', true);
+    appendLog('err', '本浏览器未启用实验扫描接口（requestLEScan），已自动切回「系统列表」模式。');
+    appendLog('err', '如需用极简列表隐藏未知设备：地址栏输入 edge://flags/#enable-experimental-web-platform-features（Chrome 用 chrome://flags/#enable-…）→ 选 Enabled → 重启浏览器 → 再切「极简列表」。');
+    appendLog('sys', '提示：在「设备名称包含」填入关键字（如 JNB），系统选择框也只会显示匹配的设备，可同样过滤未知设备。');
     return searchDevice();
   }
 
