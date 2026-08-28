@@ -199,7 +199,10 @@ function shortUuid(uuid) {
 function nameFrom(map, uuid) {
   const v = uuidTo16(uuid);
   if (v === null) return '';
-  return map['0x' + v.toString(16)] || '';
+  // 表里的键大小写不统一（多为大写如 '0x2A00'），而 toString(16) 产小写，
+  // 两种形式都要尝试，否则含 A-F 字母的 UUID 全部查不到名称。
+  const hex = v.toString(16);
+  return map['0x' + hex] || map['0x' + hex.toUpperCase()] || '';
 }
 
 function serviceName(uuid) { return nameFrom(SERVICE_NAMES, uuid); }

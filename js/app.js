@@ -75,12 +75,10 @@ function appendUartRx(label, u8) {
   maybeScroll(el);
 }
 function exportLog() {
-  const text = $('sysLog').textContent;
-  downloadFile('ble_log.txt', plainTextify(text));
-}
-function plainTextify(htmlish) {
-  // 简单按下层文本输出（去掉HTML标签由 textContent 已处理）
-  return htmlish;
+  // .line 是 span，textContent 不含换行，必须逐行 join，否则导出全挤成一行
+  const lines = Array.from($('sysLog').querySelectorAll('.line')).map((l) => l.textContent);
+  if (!lines.length) { toast('日志为空'); return; }
+  downloadFile('ble_log.txt', lines.join('\r\n'));
 }
 
 /* ============================================================
@@ -103,11 +101,13 @@ function setConnUI(connected) {
   $('deviceSection').classList.toggle('hidden', !connected);
   $('tabs').classList.toggle('hidden', !connected);
   $('connectCard').classList.toggle('hidden', connected);
+  // 未连接时隐藏全部页签内容（tab-gatt 默认带 active，否则会显示空的 GATT 卡片）
+  document.querySelectorAll('.tab-body').forEach((b) => b.classList.toggle('hidden', !connected));
 }
 function normUuid(u) {
   const t = String(u || '').trim();
   if (!t) return '';
-  try { return BluetoothUUID.canonicalUUID(t); } catch { return t; }
+  try { return BluetoothUUID.canonicalUUID(t); } catch { return normalizeServiceUuid(t) || t; }
 }
 // 把任意格式的服务 UUID 规范为完整小写 UUID：
 // '180f' / '0x180F' / '0000180f' / '0000180f-0000-1000-8000-00805f9b34fb' 都
@@ -187,6 +187,7 @@ async function searchDevice() {
   const name = elName.value.trim();
   const svc = elSvc.value.trim();
   const namedOnly = elNamed.checked;
+  appendLog('sys', `当前模式：系统列表${name ? `（按名称「${name}」过滤）` : '（未填名称，可能列出附近所有蓝牙设备）'}`);
 
   // 「只看已知设备」不强制要求填名称：不填也可以正常搜索，
   // 点选设备后会自动校验，无名称的设备会被过滤掉（见下方 dev.name 校验）。
@@ -243,6 +244,10 @@ async function searchDevice() {
 async function afterGattConnect(dev) {
   connectedName = dev.name || '(未命名)';
   connectedId = dev.id;
+  // 若旧连接还挂着（搜索时直接连了新设备），先断开，避免两个连接同时往日志里灌数据
+  if (device && device !== dev && device.gatt.connected) {
+    try { await device.gatt.disconnect(); } catch {}
+  }
   server = await dev.gatt.connect();
   device = dev;
   const svcCount = await discoverServices();
@@ -257,8 +262,11 @@ async function afterGattConnect(dev) {
   $('deviceLabel').textContent = `已连接 ${connectedName}`;
   $('metaLabel').textContent = '浏览器负责 MTU 协商';
   setConnUI(true);
+  $('btnReconnect').classList.add('hidden');
   appendLog('sys', `连接成功：${connectedName} (${connectedId.slice(0, 12)}…)`);
   dev.addEventListener('gattserverdisconnected', onDisconnected);
+  // 连接后自动按已保存的 UART 配置订阅 RX（原来只在点「保存配置」时才订阅）
+  await autoSubRx();
 }
 
 async function connectSelected() {
@@ -287,12 +295,17 @@ async function scanMini() {
   if (!navigator.bluetooth.requestLEScan) {
     searchMode = 'system';
     syncSearchModeUI();
+    saveSearchMode();
     list.classList.add('hidden');
-    toast('极简列表需开启实验开关，已切回系统列表', true);
+    setPill('', '未连接');
+    toast('已切回系统列表，请再次点击「搜索设备」', true);
     appendLog('err', '本浏览器未启用实验扫描接口（requestLEScan），已自动切回「系统列表」模式。');
     appendLog('err', '如需用极简列表隐藏未知设备：地址栏输入 edge://flags/#enable-experimental-web-platform-features（Chrome 用 chrome://flags/#enable-…）→ 选 Enabled → 重启浏览器 → 再切「极简列表」。');
     appendLog('sys', '提示：在「设备名称包含」填入关键字（如 JNB），系统选择框也只会显示匹配的设备，可同样过滤未知设备。');
-    return searchDevice();
+    // 注意：这里不能再自动调用 searchDevice() —— requestDevice 必须由真实用户手势触发，
+    // 从回退逻辑里链式发起的调用不弹选择框也不报错，表现为“点了没反应”。
+    appendLog('sys', '已切回系统列表模式，请再次点击「搜索设备」按钮打开系统选择框。');
+    return;
   }
 
   list.classList.remove('hidden');
@@ -391,18 +404,12 @@ async function reconnectDevice() {
     if (name) { opts.acceptAllDevices = false; opts.filters = [{ namePrefix: name }]; }
     else opts.acceptAllDevices = true;
     opts.optionalServices = buildOptionalServices($('fService').value.trim());
+    setPill('connecting', '选择设备…');
     const dev = await navigator.bluetooth.requestDevice(opts);
-    device = dev;
-    connectedName = dev.name || '(未命名)';
-    connectedId = dev.id;
-    server = await dev.gatt.connect();
-    setPill('connected', '已连接');
-    $('deviceInfo').textContent = `${connectedName}  ·  id:${connectedId.slice(0, 8)}`;
-    setConnUI(true);
-    $('btnReconnect').classList.add('hidden');
+    setPill('connecting', '连接中…');
+    // 走统一收尾：校验服务、刷新 UI、渲染广播数据、自动订阅 RX
+    await afterGattConnect(dev);
     appendLog('sys', `重新连接成功：${connectedName}`);
-    await discoverServices();
-    dev.addEventListener('gattserverdisconnected', onDisconnected);
   } catch (err) {
     appendLog('err', '重新连接失败：' + (err.message || err.name));
     setPill('', '未连接');
@@ -417,8 +424,9 @@ function onDisconnected(e) {
   if (device && e.target === device) {
     setPill('', '已断开');
     setConnUI(false);
-    $('btnReconnect').classList.remove('hidden');
-    appendLog('sys', '连接已断开（设备端断开或信号丢失），可点击「重新连接」');
+    // 意外断开时保留「已连接设备」卡片，否则「重新连接」按钮会被一起隐藏而无法点击
+    $('deviceSection').classList.remove('hidden');
+    appendLog('sys', '连接已断开（设备端断开或信号丢失），可点击「重新连接」或重新搜索设备');
   }
 }
 
@@ -596,7 +604,10 @@ function setCharValue(uuid, text) {
 
 async function readChar(ci) {
   try {
-    const u8 = new Uint8Array(await ci.char.readValue());
+    // readValue() 返回 DataView；new Uint8Array(DataView) 会得到长度 0 的数组，
+    // 必须按 buffer/byteOffset/byteLength 构造。
+    const dv = await ci.char.readValue();
+    const u8 = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
     const text = formatForView(u8);
     setCharValue(ci.uuid, text);
     appendLog('rx', `读取 ${charLabel(ci.uuid)}: ${formatData(u8)}`);
@@ -627,6 +638,21 @@ async function writeChar(ci, inp, noResp) {
   }
 }
 
+// 每个特征只绑定一次通知处理器：反复「订阅/取消订阅」不会叠加监听器，
+// 否则同一条通知会被重复显示多次。ci 对象随 servicesCache 重建而重置标记。
+function bindNotifyHandler(ci) {
+  if (ci._notifBound) return;
+  ci._notifBound = true;
+  ci.char.addEventListener('characteristicvaluechanged', (e) => {
+    const u8 = new Uint8Array(e.target.value.buffer.slice(0));
+    setCharValue(ci.uuid, formatForView(u8));
+    appendLog('rx', `通知 ${charLabel(ci.uuid)}: ${formatData(u8)}`);
+    appendGatt(`通知 ${charLabel(ci.uuid)}: ${formatData(u8)}`, '#4ade80');
+    protoOnData(ci.uuid, u8, 'notify');
+    if (rxCharHandle && e.target === rxCharHandle) appendUartRx('', u8);
+  });
+}
+
 async function toggleNotify(ci, btn) {
   if (subscribed.has(ci.uuid)) {
     try { await ci.char.stopNotifications(); } catch {}
@@ -640,17 +666,7 @@ async function toggleNotify(ci, btn) {
   }
   try {
     await ci.char.startNotifications();
-    ci.char.addEventListener('characteristicvaluechanged', (e) => {
-      const u8 = new Uint8Array(e.target.value.buffer.slice(0));
-      const text = formatForView(u8);
-      setCharValue(ci.uuid, text);
-      appendLog('rx', `通知 ${charLabel(ci.uuid)}: ${formatData(u8)}`);
-      appendGatt(`通知 ${charLabel(ci.uuid)}: ${formatData(u8)}`, '#4ade80');
-      protoOnData(ci.uuid, u8, 'notify');
-      if (rxCharHandle && e.target === rxCharHandle) {
-        appendUartRx('', u8);
-      }
-    });
+    bindNotifyHandler(ci);
     subscribed.add(ci.uuid);
     noteHandles.set(ci.uuid, ci.char);
     btn.textContent = '取消订阅';
@@ -668,7 +684,12 @@ function togglePoll(ci, btn) {
   pollTarget = ci.uuid;
   const sec = Math.max(1, parseInt($('pollInterval').value, 10) || 1);
   readChar(ci);
-  pollTimer = setInterval(() => { if (device && device.gatt.connected) readChar(findChar(pollTarget).ci); else stopPoll(); }, sec * 1000);
+  pollTimer = setInterval(() => {
+    if (!(device && device.gatt.connected)) { stopPoll(); return; }
+    const f = findChar(pollTarget); // 刷新服务后特征可能已不存在，需判空防崩
+    if (!f) { stopPoll(); appendLog('err', '定读的特征已不存在，已停止定读'); return; }
+    readChar(f.ci);
+  }, sec * 1000);
   btn.textContent = '停止定读';
   btn.classList.add('on');
   appendLog('sys', `开始定时读取 ${charLabel(ci.uuid)}, 每 ${sec} 秒`);
@@ -711,11 +732,8 @@ async function autoSubRx() {
   if (subscribed.has(canon)) return;
   try {
     await find.ci.char.startNotifications();
-    find.ci.char.addEventListener('characteristicvaluechanged', (e) => {
-      const u8 = new Uint8Array(e.target.value.buffer.slice(0));
-      appendUartRx('', u8);
-      protoOnData(canon, u8, 'notify');
-    });
+    // 统一走 bindNotifyHandler，避免与手动订阅的监听器叠加导致重复显示
+    bindNotifyHandler(find.ci);
     rxCharHandle = find.ci.char;
     subscribed.add(canon);
     appendLog('sys', `已自动订阅 RX 特征值(${shortUuid(canon)})`);
@@ -936,8 +954,10 @@ function addResultRow(uuid, u8, rules) {
 function clearResults() { $('resultTable').innerHTML = ''; resultColumns = []; }
 function exportCsv() {
   const table = $('resultTable');
-  if (!table.children.length) { toast('暂无解析结果'); return; }
-  const headers = Array.from(table.querySelector('.res-row span')).map((s) => s.dataset.h);
+  const first = table.querySelector('.res-row');
+  if (!first) { toast('暂无解析结果'); return; }
+  // 注意：querySelector 返回单个元素，Array.from(元素) 会得到 []，表头必须用 querySelectorAll 取
+  const headers = Array.from(first.querySelectorAll('.res-c')).map((s) => s.dataset.h);
   const lines = [headers.join(',')];
   table.querySelectorAll('.res-row').forEach((r) => {
     lines.push(Array.from(r.querySelectorAll('.res-c')).map(csvCell).join(','));
@@ -964,6 +984,18 @@ function switchTab(name) {
 }
 function syncSearchModeUI() {
   document.querySelectorAll('#searchMode .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === searchMode));
+}
+// 记住用户选择的搜索模式：避免每次刷新都重置成「系统列表」，
+// 换了支持/不支持实验接口的浏览器也能自动纠正（扫描时还会再校验一次）
+function saveSearchMode() {
+  try { localStorage.setItem('ble_search_mode', searchMode); } catch {}
+}
+function loadSearchMode() {
+  try {
+    const m = localStorage.getItem('ble_search_mode');
+    if (m === 'system' || m === 'mini') searchMode = m;
+  } catch {}
+  syncSearchModeUI();
 }
 
 /* ============================================================
@@ -1003,6 +1035,7 @@ function init() {
     const b = e.target.closest('.seg-btn'); if (!b) return;
     searchMode = b.dataset.mode;
     syncSearchModeUI();
+    saveSearchMode();
     $('miniList').classList.add('hidden');
     toast(searchMode === 'mini' ? '已切换极简列表：点「搜索设备」在页面内扫描' : '已切换系统列表', false);
   });
@@ -1014,10 +1047,12 @@ function init() {
   bindByteSelect();
   loadUart();
   loadProtocols();
+  loadSearchMode();
 
+  setConnUI(false);
   setPill('', '未连接');
-  appendLog('sys', '就绪。请点击「连接设备」，在弹出的系统选择框中选择你的 BLE 设备。');
-  appendLog('sys', '页面版本 v20260828-g；如非最新请刷新（清缓存）后重试。');
+  appendLog('sys', '就绪。请点击「搜索设备」，在弹出的系统选择框中选择你的 BLE 设备。');
+  appendLog('sys', '页面版本 v20260829-b；如非最新请刷新（清缓存）后重试。');
 }
 
 document.addEventListener('DOMContentLoaded', init);

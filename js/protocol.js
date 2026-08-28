@@ -28,7 +28,7 @@ function parseHex(text) {
   if (cleaned.length % 2 !== 0) throw new Error('HEX 长度必须为偶数（每字节两位十六进制）');
   const out = new Uint8Array(cleaned.length / 2);
   for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(cleaned.substr(i * 2, 2), 16);
+    out[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);
   }
   return out;
 }
