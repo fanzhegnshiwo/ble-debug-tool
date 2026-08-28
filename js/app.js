@@ -157,10 +157,21 @@ function buildOptionalServices(userSvc) {
 // 第一步：搜索设备。system 用系统选择框；mini 用实验接口在页面内渲染列表
 async function searchDevice() {
   appendLog('sys', '点击搜索：开始查找设备…');
+  // 防旧缓存混合页面：关键 DOM 缺失时明确报错，而不是静默崩掉
+  const elMode = $('searchMode');
+  const elName = $('fName');
+  const elSvc = $('fService');
+  const elNamed = $('ckNamed');
+  if (!elMode || !elName || !elSvc || !elNamed) {
+    appendLog('err', '发现页面结构不完整（很可能加载了旧缓存）。请点击浏览器刷新按钮，或清除缓存后重开本页。');
+    toast('页面是旧缓存，请刷新后再试', true);
+    setPill('', '未连接');
+    return;
+  }
   if (searchMode === 'mini') return scanMini();
-  const name = $('fName').value.trim();
-  const svc = $('fService').value.trim();
-  const namedOnly = $('ckNamed').checked;
+  const name = elName.value.trim();
+  const svc = elSvc.value.trim();
+  const namedOnly = elNamed.checked;
 
   // 「只看已知设备」：要让系统列表把未知/无名设备收进「其它设备」折叠区，
   // 必须带名称关键字（namePrefix）。没有关键字的话，浏览器无法按"有没有名字"过滤。
@@ -994,6 +1005,7 @@ function init() {
 
   setPill('', '未连接');
   appendLog('sys', '就绪。请点击「连接设备」，在弹出的系统选择框中选择你的 BLE 设备。');
+  appendLog('sys', '页面版本 v20260828-c；如非最新请刷新（清缓存）后重试。');
 }
 
 document.addEventListener('DOMContentLoaded', init);
