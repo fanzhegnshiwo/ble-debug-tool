@@ -2,6 +2,13 @@
 
 一个可直接部署到 **GitHub Pages / Gitee Pages** 的手机端 BLE（低功耗蓝牙）调试工具。纯前端、无后端，基于浏览器原生 **Web Bluetooth API**。
 
+## 在线地址
+
+> **在手机（Android + Chrome/Edge）上直接打开下方地址即可使用。**
+
+- ✅ GitHub Pages：<https://fanzhegnshiwo.github.io/ble-debug-tool/>
+- 🆕 Gitee Pages（国内访问更快，推荐）：<https://fanhengshiwo.gitee.io/ble-debug-tool/>
+
 ## 功能
 
 - **设备扫描与连接**：扫描附近 BLE 设备，支持按服务 UUID 过滤
