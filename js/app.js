@@ -156,6 +156,7 @@ function buildOptionalServices(userSvc) {
 
 // 第一步：搜索设备。system 用系统选择框；mini 用实验接口在页面内渲染列表
 async function searchDevice() {
+  appendLog('sys', '点击搜索：开始查找设备…');
   if (searchMode === 'mini') return scanMini();
   const name = $('fName').value.trim();
   const svc = $('fService').value.trim();
@@ -164,7 +165,8 @@ async function searchDevice() {
   // 「只看已知设备」：要让系统列表把未知/无名设备收进「其它设备」折叠区，
   // 必须带名称关键字（namePrefix）。没有关键字的话，浏览器无法按"有没有名字"过滤。
   if (namedOnly && !name) {
-    toast('已勾选「只看已知设备」：请在上方「设备名称包含」填入关键字以过滤未知设备', true);
+    appendLog('err', '搜索被拦截：已勾选「只看已知设备」，但「设备名称包含」为空。请填入名称关键字（如 JNB）后重试，或取消勾选「只看已知设备」。');
+    toast('请填入名称关键字或取消「只看已知设备」', true);
     setPill('', '未连接');
     return;
   }
@@ -207,7 +209,8 @@ async function searchDevice() {
     appendLog('sys', `已选择设备：${connectedName}，请点击「连接」`);
   } catch (err) {
     if (err.name === 'SecurityError') {
-      toast('需要 HTTPS 或授权', true);
+      appendLog('err', '搜索失败：请确认页面以 https:// 或 localhost 打开（当前非安全上下文），并开启蓝牙权限。');
+      toast('需要 https 或 localhost 打开', true);
       setPill('', '未连接');
       return;
     }
@@ -266,6 +269,7 @@ async function scanMini() {
     searchMode = 'system';
     syncSearchModeUI();
     list.classList.add('hidden');
+    appendLog('err', '极简列表不可用（浏览器不支持 requestLEScan），已自动切回「系统列表」模式，即将用系统选择框搜索。');
     return searchDevice();
   }
 
