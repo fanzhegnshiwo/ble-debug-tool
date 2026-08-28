@@ -1017,7 +1017,7 @@ function init() {
 
   setPill('', '未连接');
   appendLog('sys', '就绪。请点击「连接设备」，在弹出的系统选择框中选择你的 BLE 设备。');
-  appendLog('sys', '页面版本 v20260828-c；如非最新请刷新（清缓存）后重试。');
+  appendLog('sys', '页面版本 v20260828-g；如非最新请刷新（清缓存）后重试。');
 }
 
 document.addEventListener('DOMContentLoaded', init);
