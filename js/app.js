@@ -188,14 +188,8 @@ async function searchDevice() {
   const svc = elSvc.value.trim();
   const namedOnly = elNamed.checked;
 
-  // 「只看已知设备」：要让系统列表把未知/无名设备收进「其它设备」折叠区，
-  // 必须带名称关键字（namePrefix）。没有关键字的话，浏览器无法按"有没有名字"过滤。
-  if (namedOnly && !name) {
-    appendLog('err', '搜索被拦截：已勾选「只看已知设备」，但「设备名称包含」为空。请填入名称关键字（如 JNB）后重试，或取消勾选「只看已知设备」。');
-    toast('请填入名称关键字或取消「只看已知设备」', true);
-    setPill('', '未连接');
-    return;
-  }
+  // 「只看已知设备」不强制要求填名称：不填也可以正常搜索，
+  // 点选设备后会自动校验，无名称的设备会被过滤掉（见下方 dev.name 校验）。
 
   const opts = { acceptAllDevices: true };
   const filter = {};
@@ -322,7 +316,8 @@ async function scanMini() {
     // 从广播包收集服务 UUID（e.serviceData 的键 / e.uuids），连接授权时自动声明
     if (e.serviceData) Object.keys(e.serviceData).forEach((u) => advUuidsSet.add(u));
     if (Array.isArray(e.uuids)) e.uuids.forEach((u) => advUuidsSet.add(u));
-    if (namedOnly && !d.name) return;          // 只看已知设备：无名设备不渲染
+    // 只看有名称：不填名称也可以扫，但无名称设备不渲染进列表
+    if (namedOnly && !d.name) return;
     if (!d.name) d.name = '(未命名)';
     if (seen.has(d.id)) return;
     seen.add(d.id); found++;
