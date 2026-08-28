@@ -98,7 +98,8 @@ body {
 /* ---------- 表单控件 ---------- */
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field label { font-size: 12px; color: var(--muted); }
-.connect-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.connect-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.chk-scan { margin: 0 0 10px; }
 @media (min-width: 480px) {
   .connect-filters { flex-direction: row; }
   .connect-filters .field { flex: 1; }

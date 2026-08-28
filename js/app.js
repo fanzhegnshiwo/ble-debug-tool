@@ -142,6 +142,15 @@ async function searchDevice() {
   setPill('connecting', '搜索中…');
   try {
     const dev = await navigator.bluetooth.requestDevice(opts);
+    const namedOnly = $('ckNamed').checked;
+    // 「跳过无名称设备」：系统列表无法主动过滤无名设备，只能在选中后校验
+    if (namedOnly && !dev.name) {
+      $('selectedCard').classList.add('hidden');
+      setPill('', '未连接');
+      toast('该设备未命名，已按「跳过无名称设备」过滤', true);
+      appendLog('sys', '所选设备没有名称，被「跳过无名称设备」过滤。如需连接，请取消勾选后再搜索。');
+      return;
+    }
     pendingDevice = dev;
     connectedName = dev.name || '(未命名)';
     connectedId = dev.id;
