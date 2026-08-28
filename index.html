@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1020">
   <meta name="description" content="BLE 蓝牙调试助手 - 手机网页版，基于 Web Bluetooth，支持服务浏览、读写、通知、协议解析。">
   <title>BLE 蓝牙调试助手</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828e">
+  <link rel="stylesheet" href="css/style.css?v=20260828f">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -50,6 +50,11 @@
         </div>
       </div>
       <label class="chk chk-scan"><input type="checkbox" id="ckNamed" checked> 只看有名称的设备（选中无名称的设备会自动过滤）</label>
+      <p class="hint dim" style="font-size:11.5px;margin:2px 0 4px;line-height:1.5">
+        说明：系统列表是浏览器原生选择框，会把附近所有蓝牙（含无名称的）都显示出来，网页无法隐藏它们。
+        想完全隐藏未知设备：在浏览器地址栏输入 <b>edge://flags/#enable-experimental-web-platform-features</b>
+        （Chrome 则输入 <b>chrome://flags/…</b>）→ 选 Enabled → 重启浏览器，再切到「极简列表」模式搜索。
+      </p>
       <div class="seg" id="searchMode">
         <button class="seg-btn active" data-mode="system">系统列表</button>
         <button class="seg-btn" data-mode="mini">极简列表</button>
