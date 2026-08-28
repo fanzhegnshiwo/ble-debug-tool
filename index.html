@@ -68,6 +68,24 @@
       </div>
     </section>
 
+    <!-- 系统日志（未连接也常驻显示，便于排查） -->
+    <section class="card">
+      <div class="card-head">
+        <h2>系统日志</h2>
+        <span class="right">
+          <button id="btnExportLog" class="btn ghost small">导出</button>
+          <button id="btnClearLog" class="btn ghost small">清空</button>
+        </span>
+      </div>
+      <div class="chk-row">
+        <label class="chk"><input type="checkbox" data-filter="rx" checked> RX</label>
+        <label class="chk"><input type="checkbox" data-filter="tx" checked> TX</label>
+        <label class="chk"><input type="checkbox" data-filter="sys" checked> 系统</label>
+        <label class="chk"><input type="checkbox" data-filter="err" checked> 错误</label>
+      </div>
+      <div id="sysLog" class="log mono"></div>
+    </section>
+
     <!-- 已连接设备信息 + 广播数据 -->
     <section id="deviceSection" class="hidden">
       <section class="card">
@@ -85,12 +103,11 @@
       </section>
     </section>
 
-    <!-- 功能页签 -->
+    <!-- 页签 -->
     <nav id="tabs" class="tabs hidden">
       <button data-tab="gatt" class="tab active">服务</button>
       <button data-tab="uart" class="tab">透传</button>
       <button data-tab="proto" class="tab">协议</button>
-      <button data-tab="log" class="tab">日志</button>
     </nav>
 
     <!-- 服务与特征 -->
@@ -195,25 +212,7 @@
       </div>
     </section>
 
-    <!-- 日志 -->
-    <section id="tab-log" class="tab-body">
-      <div class="card">
-        <div class="card-head">
-          <h2>系统日志</h2>
-          <span class="right">
-            <button id="btnExportLog" class="btn ghost small">导出</button>
-            <button id="btnClearLog" class="btn ghost small">清空</button>
-          </span>
-        </div>
-        <div class="chk-row">
-          <label class="chk"><input type="checkbox" data-filter="rx" checked> RX</label>
-          <label class="chk"><input type="checkbox" data-filter="tx" checked> TX</label>
-          <label class="chk"><input type="checkbox" data-filter="sys" checked> 系统</label>
-          <label class="chk"><input type="checkbox" data-filter="err" checked> 错误</label>
-        </div>
-        <div id="sysLog" class="log mono"></div>
-      </div>
-    </section>
+    <!-- 日志页签已移至连接卡片下方常驻显示 -->
 
   </main>
 
