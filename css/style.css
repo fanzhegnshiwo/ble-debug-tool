@@ -143,6 +143,18 @@ body {
 
 .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
+/* 已选设备卡片（搜索 -> 点连接） */
+.selected-card {
+  margin-top: 12px; padding: 12px; border-radius: 10px;
+  background: var(--panel-2); border: 1px solid rgba(34,211,238,.35);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.selected-card.hidden { display: none; }
+.select-info { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 2px; }
+.select-info #selectedName { color: var(--accent-2); font-weight: 600; word-break: break-all; font-size: 13px; }
+.select-info #selectedMeta { font-size: 11px; }
+.selected-card .btn { flex: 0 0 auto; }
+
 /* ---------- 分段按钮（文本/HEX） ---------- */
 .seg { display: flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; margin-bottom: 10px; width: fit-content; }
 .seg-btn { border: none; background: transparent; color: var(--muted); padding: 7px 20px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; }

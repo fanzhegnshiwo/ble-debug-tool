@@ -89,7 +89,7 @@ function plainTextify(htmlish) {
 function detectSupport() {
   if (!navigator.bluetooth) {
     $('unsupported').classList.remove('hidden');
-    $('btnConnect').disabled = true;
+    $('btnScan').disabled = true;
     return false;
   }
   return true;
@@ -118,7 +118,11 @@ function canonicFilter(u) {
 /* ============================================================
  * 连接 / 断开
  * ============================================================ */
-async function connectDevice() {
+let pendingDevice = null;  // 用户从系统列表选中的设备（尚未连接）
+
+// 第一步：搜索设备。Web Bluetooth 不允许网页自行列出附近设备，
+// 只能通过 requestDevice 弹出系统蓝牙列表，由用户点选。
+async function searchDevice() {
   const name = $('fName').value.trim();
   const svc = $('fService').value.trim();
 
@@ -135,17 +139,41 @@ async function connectDevice() {
     opts.filters = [filter];
   }
 
-  setPill('connecting', '连接中…');
+  setPill('connecting', '搜索中…');
   try {
     const dev = await navigator.bluetooth.requestDevice(opts);
+    pendingDevice = dev;
     connectedName = dev.name || '(未命名)';
     connectedId = dev.id;
     lastFs = name;
+    // 选出后先显示已选设备，等用户点「连接」
+    $('selectedName').textContent = connectedName;
+    $('selectedMeta').textContent = `id: ${connectedId.slice(0, 12)}…`;
+    $('selectedCard').classList.remove('hidden');
+    setPill('', '已选设备');
+    appendLog('sys', `已选择设备：${connectedName}，请点击「连接」`);
+  } catch (err) {
+    if (err.name === 'SecurityError') {
+      toast('需要 HTTPS 或授权', true);
+      setPill('', '未连接');
+      return;
+    }
+    if (err.name !== 'NotFoundError') appendLog('err', '搜索失败/取消：' + (err.message || err.name));
+    setPill('', '未连接');
+  }
+}
+
+// 第二步：真正建立连接
+async function connectSelected() {
+  if (!pendingDevice) { toast('请先搜索并选择设备', true); return; }
+  const dev = pendingDevice;
+  setPill('connecting', '连接中…');
+  try {
     device = dev;
-    // 解析广播数据
-    renderAdvertisement(dev);
     server = await dev.gatt.connect();
+    device = dev;
     setPill('connected', '已连接');
+    renderAdvertisement(dev);
     $('deviceInfo').textContent = `${connectedName}  ·  id:${connectedId.slice(0, 8)}`;
     $('deviceLabel').textContent = `已连接 ${connectedName}`;
     $('metaLabel').textContent = '浏览器负责 MTU 协商';
@@ -154,18 +182,13 @@ async function connectDevice() {
     await discoverServices();
     dev.addEventListener('gattserverdisconnected', onDisconnected);
   } catch (err) {
-    if (err.name === 'SecurityError') {
-      toast('需要 HTTPS 或授权', true);
-      setPill('', '未连接');
-      return;
-    }
-    if (err.name !== 'NotFoundError') appendLog('err', '连接失败/取消：' + (err.message || err.name));
+    appendLog('err', '连接失败：' + (err.message || err.name));
     setPill('', '未连接');
   }
 }
 
 async function reconnectDevice() {
-  const name = $('fName').value.trim();
+  const name = lastFs || $('fName').value.trim();
   try {
     const opts = {};
     if (name) { opts.acceptAllDevices = false; opts.filters = [{ namePrefix: name }]; }
@@ -743,7 +766,8 @@ function switchTab(name) {
 function init() {
   if (!detectSupport()) return;
 
-  $('btnConnect').addEventListener('click', connectDevice);
+  $('btnScan').addEventListener('click', searchDevice);
+  $('btnConnectSel').addEventListener('click', connectSelected);
   $('btnDisconnect').addEventListener('click', disconnectDevice);
   $('btnReconnect').addEventListener('click', reconnectDevice);
   $('btnRefreshSvc').addEventListener('click', () => server && discoverServices());

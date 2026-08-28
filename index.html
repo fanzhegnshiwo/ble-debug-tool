@@ -46,8 +46,16 @@
           <input id="fService" class="text mono" placeholder="如 180f / 6e400001 / Battery">
         </div>
       </div>
-      <button id="btnConnect" class="btn primary block">连接设备</button>
-      <p class="hint">点击后将弹出系统蓝牙选择框，选择你的设备即可连接。</p>
+      <button id="btnScan" class="btn primary block">搜索设备</button>
+      <p class="hint">点击后弹出系统蓝牙列表，会列出附近所有蓝牙设备，选择你要连接的设备，然后点「连接」。</p>
+
+      <div id="selectedCard" class="selected-card hidden">
+        <div class="select-info">
+          <span id="selectedName" class="mono"></span>
+          <span id="selectedMeta" class="dim"></span>
+        </div>
+        <button id="btnConnectSel" class="btn primary">连接</button>
+      </div>
     </section>
 
     <!-- 已连接设备信息 + 广播数据 -->
