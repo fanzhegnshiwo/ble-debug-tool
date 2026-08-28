@@ -119,10 +119,11 @@ function canonicFilter(u) {
  * 连接 / 断开
  * ============================================================ */
 let pendingDevice = null;  // 用户从系统列表选中的设备（尚未连接）
+let searchMode = 'system'; // system=系统列表 / mini=极简列表（实验扫描）
 
-// 第一步：搜索设备。Web Bluetooth 不允许网页自行列出附近设备，
-// 只能通过 requestDevice 弹出系统蓝牙列表，由用户点选。
+// 第一步：搜索设备。system 用系统选择框；mini 用实验接口在页面内渲染列表
 async function searchDevice() {
+  if (searchMode === 'mini') return scanMini();
   const name = $('fName').value.trim();
   const svc = $('fService').value.trim();
   const namedOnly = $('ckNamed').checked;
@@ -180,29 +181,34 @@ async function searchDevice() {
   }
 }
 
-// 第二步：真正建立连接
+// 第二步：真正建立连接（系统列表/极简列表共用收尾）
+async function afterGattConnect(dev) {
+  connectedName = dev.name || '(未命名)';
+  connectedId = dev.id;
+  server = await dev.gatt.connect();
+  device = dev;
+  const svcCount = await discoverServices();
+  // 没有任何 GATT 服务 -> 视为不可用/不支持
+  if (svcCount === 0) {
+    await dev.gatt.disconnect().catch(() => {});
+    throw new Error('该设备无可用的 GATT 服务');
+  }
+  setPill('connected', '已连接');
+  renderAdvertisement(dev);
+  $('deviceInfo').textContent = `${connectedName}  ·  id:${connectedId.slice(0, 8)}`;
+  $('deviceLabel').textContent = `已连接 ${connectedName}`;
+  $('metaLabel').textContent = '浏览器负责 MTU 协商';
+  setConnUI(true);
+  appendLog('sys', `连接成功：${connectedName} (${connectedId.slice(0, 12)}…)`);
+  dev.addEventListener('gattserverdisconnected', onDisconnected);
+}
+
 async function connectSelected() {
   if (!pendingDevice) { toast('请先搜索并选择设备', true); return; }
   const dev = pendingDevice;
   setPill('connecting', '连接中…');
   try {
-    device = dev;
-    server = await dev.gatt.connect();
-    device = dev;
-    const svcCount = await discoverServices();
-    // 没有任何 GATT 服务 -> 视为不可用/不支持
-    if (svcCount === 0) {
-      await dev.gatt.disconnect().catch(() => {});
-      throw new Error('该设备无可用的 GATT 服务');
-    }
-    setPill('connected', '已连接');
-    renderAdvertisement(dev);
-    $('deviceInfo').textContent = `${connectedName}  ·  id:${connectedId.slice(0, 8)}`;
-    $('deviceLabel').textContent = `已连接 ${connectedName}`;
-    $('metaLabel').textContent = '浏览器负责 MTU 协商';
-    setConnUI(true);
-    appendLog('sys', `连接成功：${connectedName} (${connectedId.slice(0, 12)}…)`);
-    dev.addEventListener('gattserverdisconnected', onDisconnected);
+    await afterGattConnect(dev);
   } catch (err) {
     // 连接失败 -> 视为未知/不支持的设备，自动过滤
     pendingDevice = null;
@@ -210,6 +216,102 @@ async function connectSelected() {
     setPill('', '未连接');
     appendLog('err', '所选设备不可用（未知或不支持），已过滤：' + (err.message || err.name));
     toast('设备不可用，已过滤', true);
+  }
+}
+
+/* ---- 极简列表模式：requestLEScan（实验）在页面内渲染，只显示匹配设备 ---- */
+async function scanMini() {
+  const name = $('fName').value.trim();
+  const namedOnly = $('ckNamed').checked;
+  const svc = $('fService').value.trim();
+  const list = $('miniList');
+
+  if (!navigator.bluetooth.requestLEScan) {
+    toast('当前浏览器不支持实验扫描接口，已切回系统列表', true);
+    searchMode = 'system';
+    syncSearchModeUI();
+    list.classList.add('hidden');
+    return searchDevice();
+  }
+
+  list.classList.remove('hidden');
+  list.innerHTML = '<div class="mini-item dim">正在扫描（仅显示匹配设备）…</div>';
+  setPill('connecting', '扫描中…');
+
+  const scanOptions = {};
+  const filter = {};
+  if (name) filter.namePrefix = name;
+  if (svc) {
+    const c = canonicFilter(svc);
+    if (!c) { toast('服务 UUID 格式无效', true); return; }
+    filter.services = [c];
+  }
+  if (Object.keys(filter).length) scanOptions.filters = [filter];
+  else scanOptions.acceptAllAdvertisements = true;
+
+  let found = 0;
+  const seen = new Set();
+  const onAdv = (e) => {
+    const d = e.device;
+    if (namedOnly && !d.name) return;          // 只看已知设备：无名设备不渲染
+    if (!d.name) d.name = '(未命名)';
+    if (seen.has(d.id)) return;
+    seen.add(d.id); found++;
+    const row = document.createElement('div');
+    row.className = 'mini-item';
+    row.innerHTML =
+      `<span class="mini-name">${esc(d.name)}</span>` +
+      `<span class="mini-meta">${esc(d.id.slice(0, 8))} · ${e.rssi} dBm</span>`;
+    row.addEventListener('click', () => {
+      try { scan.stop(); } catch {}
+      cleanupAdv();
+      onMiniPick(d);
+    });
+    list.insertBefore(row, list.firstChild);
+  };
+  const cleanupAdv = () => navigator.bluetooth.removeEventListener('advertisementreceived', onAdv);
+
+  try {
+    const scan = await navigator.bluetooth.requestLEScan(scanOptions);
+    navigator.bluetooth.addEventListener('advertisementreceived', onAdv);
+    setTimeout(() => {
+      cleanupAdv();
+      try { scan.stop(); } catch {}
+      setPill('', found ? '扫描完成' : '未连接');
+      if (!found) list.innerHTML = '<div class="mini-item dim">未找到匹配设备，请确认设备已开机且在附近，再次搜索</div>';
+    }, 8000);
+  } catch (err) {
+    cleanupAdv();
+    setPill('', '未连接');
+    appendLog('err', '极简列表扫描失败：' + (err.message || err.name));
+    if (/flag|Permission|NotAllowed|scan/i.test(err.name + err.message)) {
+      list.innerHTML = '<div class="mini-item dim">实验扫描不可用：Chrome/Edge 需打开 chrome://flags/#enable-experimental-web-platform-features 并重启，或改回「系统列表」模式</div>';
+    } else {
+      list.innerHTML = `<div class="mini-item dim">扫描失败：${esc(err.message)}</div>`;
+    }
+  }
+}
+
+async function onMiniPick(d) {
+  setPill('connecting', '连接中…');
+  try {
+    // 扫描到的设备可能还没有访问权限：先尝试直接连接，无权限则借系统框补一次授权
+    try {
+      await d.gatt.connect();
+      await d.gatt.disconnect();
+    } catch (e) {
+      if (e.name !== 'NotAllowedError' && e.name !== 'SecurityError') throw e;
+      const opts = { acceptAllDevices: true };
+      const filter = {};
+      if (d.name) filter.name = d.name;
+      if (Object.keys(filter).length) { opts.acceptAllDevices = false; opts.filters = [filter]; }
+      d = await navigator.bluetooth.requestDevice(opts);
+    }
+    await afterGattConnect(d);
+  } catch (err) {
+    setPill('', '未连接');
+    appendLog('err', '连接失败：' + (err.message || err.name));
+    toast('连接失败，已过滤', true);
   }
 }
 
@@ -787,6 +889,9 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-body').forEach((b) => b.classList.toggle('active', b.id === 'tab-' + name));
 }
+function syncSearchModeUI() {
+  document.querySelectorAll('#searchMode .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === searchMode));
+}
 
 /* ============================================================
  * 初始化
@@ -820,6 +925,13 @@ function init() {
     sendMode = b.dataset.mode;
     document.querySelectorAll('#sendMode .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
     $('sendInput').placeholder = sendMode === 'hex' ? '输入 HEX，如 01 02 A0 FF' : '输入文本…';
+  });
+  $('searchMode').addEventListener('click', (e) => {
+    const b = e.target.closest('.seg-btn'); if (!b) return;
+    searchMode = b.dataset.mode;
+    syncSearchModeUI();
+    $('miniList').classList.add('hidden');
+    toast(searchMode === 'mini' ? '已切换极简列表：点「搜索设备」在页面内扫描' : '已切换系统列表', false);
   });
   document.querySelectorAll('input[data-filter]').forEach((chk) => {
     chk.addEventListener('change', () => { logFilters[chk.dataset.filter] = chk.checked; });

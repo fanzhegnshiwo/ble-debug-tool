@@ -124,6 +124,15 @@ body {
 .chk-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
 .chk input { accent-color: var(--accent); width: 15px; height: 15px; }
 
+/* ---------- 极简列表（实验扫描） ---------- */
+.mini-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 10px; padding: 8px; max-height: 260px; overflow-y: auto; }
+.mini-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+.mini-item:hover { border-color: var(--accent); background: rgba(64,128,255,.08); }
+.mini-item .mini-name { font-weight: 600; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+.mini-item .mini-meta { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.mini-item.dim { justify-content: center; cursor: default; font-size: 12px; color: var(--muted); }
+.mini-item.dim:hover { border-color: var(--border); background: var(--panel); }
+
 /* ---------- 按钮 ---------- */
 .btn {
   border: none; border-radius: 9px; cursor: pointer;

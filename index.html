@@ -47,8 +47,14 @@
         </div>
       </div>
       <label class="chk chk-scan"><input type="checkbox" id="ckNamed" checked> 只看已知设备（需填名称关键字）</label>
+      <div class="seg" id="searchMode">
+        <button class="seg-btn active" data-mode="system">系统列表</button>
+        <button class="seg-btn" data-mode="mini">极简列表</button>
+      </div>
       <button id="btnScan" class="btn primary block">搜索设备</button>
-      <p class="hint">勾选「只看已知设备」后，必须在「设备名称包含」填入关键字（如 JNB）才能搜索——系统列表会把匹配的单独列出，未知/无名设备收进「其它设备」隐藏起来。连不上、或读不出 GATT 服务的设备会被当作未知/不支持自动过滤。</p>
+      <p class="hint">「系统列表」用浏览器自带选择框（Android 手机 Chrome/Edge 用它）；「极简列表」在页面上自己渲染设备列表，只显示匹配名称的设备，不展示任何未知设备（需 Chrome/Edge 桌面版开启实验开关，手机暂不支持）。连不上、或读不出 GATT 服务的设备会被自动过滤。</p>
+
+      <div id="miniList" class="mini-list hidden"></div>
 
       <div id="selectedCard" class="selected-card hidden">
         <div class="select-info">
