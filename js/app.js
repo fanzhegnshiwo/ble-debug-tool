@@ -125,6 +125,15 @@ let pendingDevice = null;  // 用户从系统列表选中的设备（尚未连�
 async function searchDevice() {
   const name = $('fName').value.trim();
   const svc = $('fService').value.trim();
+  const namedOnly = $('ckNamed').checked;
+
+  // 「只看已知设备」：要让系统列表把未知/无名设备收进「其它设备」折叠区，
+  // 必须带名称关键字（namePrefix）。没有关键字的话，浏览器无法按"有没有名字"过滤。
+  if (namedOnly && !name) {
+    toast('已勾选「只看已知设备」：请在上方「设备名称包含」填入关键字以过滤未知设备', true);
+    setPill('', '未连接');
+    return;
+  }
 
   const opts = { acceptAllDevices: true };
   const filter = {};
@@ -142,13 +151,12 @@ async function searchDevice() {
   setPill('connecting', '搜索中…');
   try {
     const dev = await navigator.bluetooth.requestDevice(opts);
-    const namedOnly = $('ckNamed').checked;
-    // 「跳过无名称设备」：系统列表无法主动过滤无名设备，只能在选中后校验
+    // 「只看已知设备」兜底：系统列表无法主动过滤无名设备，选中后再次校验
     if (namedOnly && !dev.name) {
       $('selectedCard').classList.add('hidden');
       setPill('', '未连接');
-      toast('该设备未命名，已按「跳过无名称设备」过滤', true);
-      appendLog('sys', '所选设备没有名称，被「跳过无名称设备」过滤。如需连接，请取消勾选后再搜索。');
+      toast('该设备未命名，已按「只看已知设备」过滤', true);
+      appendLog('sys', '所选设备没有名称，被「只看已知设备」过滤。如需连接，请取消勾选后再搜索。');
       return;
     }
     pendingDevice = dev;
