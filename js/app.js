@@ -120,6 +120,39 @@ function canonicFilter(u) {
  * ============================================================ */
 let pendingDevice = null;  // 用户从系统列表选中的设备（尚未连接）
 let searchMode = 'system'; // system=系统列表 / mini=极简列表（实验扫描）
+const advUuidsSet = new Set(); // 极简列表扫描中从广播包收集到的服务 UUID
+
+// 常用 GATT 服务 UUID：连接时声明到 optionalServices，避免
+// 「Origin is not allowed to access any service」导致服务枚举被浏览器拒绝
+const COMMON_SERVICES = [
+  '1800','1801','1802','1803','1804','1805','1806','1807','1808','1809',
+  '180a','180b','180c','180d','180e','180f','1810','1811','1812','1813',
+  '1814','1815','1816','1817','1818','1819','181a','181b','181c','181d',
+  '181e','181f','1820','1821','1822','1823','1824','1825','1826','1827',
+  '1828','1829','182a','182b','182c','182d','182e','182f','1830','1831',
+  '1832','1833','1834','1835','1836','1837','1838','1839','183a','183b',
+  '183c','183d','183e','183f','1840','1841','1842','1843','1844','1845',
+  '1846','1847','1848','1849','184a','184b','184c','184d','184e','184f',
+  '1850','1851','1852','1853','1854','1855','1856','1857','1858','1859',
+  '185a','185b','185c','185d','185e','185f','1860','1861','1862','1863',
+  '1864','1865','1866','1867','1868','1869','186a','186b','186c',
+  // 常见厂商/模组服务（串口透传类）
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+  '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 / CC2541 串口
+  '0000fff0-0000-1000-8000-00805f9b34fb', // 常用模组服务
+  '000018f0-0000-1000-8000-00805f9b34fb', // 各家自定义
+  '0000fe00-0000-1000-8000-00805f9b34fb', // 私有扩展
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+];
+// 连接时组装 optionalServices：常用表 + 用户填写的服务
+function buildOptionalServices(userSvc) {
+  const list = COMMON_SERVICES.slice();
+  if (userSvc) {
+    const c = canonicFilter(userSvc);
+    if (c && !list.includes(c)) list.push(c);
+  }
+  return list;
+}
 
 // 第一步：搜索设备。system 用系统选择框；mini 用实验接口在页面内渲染列表
 async function searchDevice() {
@@ -148,6 +181,8 @@ async function searchDevice() {
     opts.acceptAllDevices = false;
     opts.filters = [filter];
   }
+  // 关键：声明可访问的服务，否则浏览器拒绝枚举 GATT 服务
+  opts.optionalServices = buildOptionalServices(svc);
 
   setPill('connecting', '搜索中…');
   try {
@@ -237,6 +272,7 @@ async function scanMini() {
   list.classList.remove('hidden');
   list.innerHTML = '<div class="mini-item dim">正在扫描（仅显示匹配设备）…</div>';
   setPill('connecting', '扫描中…');
+  advUuidsSet.clear();
 
   const scanOptions = {};
   const filter = {};
@@ -253,6 +289,9 @@ async function scanMini() {
   const seen = new Set();
   const onAdv = (e) => {
     const d = e.device;
+    // 从广播包收集服务 UUID（e.serviceData 的键 / e.uuids），连接授权时自动声明
+    if (e.serviceData) Object.keys(e.serviceData).forEach((u) => advUuidsSet.add(u));
+    if (Array.isArray(e.uuids)) e.uuids.forEach((u) => advUuidsSet.add(u));
     if (namedOnly && !d.name) return;          // 只看已知设备：无名设备不渲染
     if (!d.name) d.name = '(未命名)';
     if (seen.has(d.id)) return;
@@ -305,6 +344,9 @@ async function onMiniPick(d) {
       const filter = {};
       if (d.name) filter.name = d.name;
       if (Object.keys(filter).length) { opts.acceptAllDevices = false; opts.filters = [filter]; }
+      // 带广播包收集到的服务 + 常用服务授权，否则服务枚举会被拒绝
+      opts.optionalServices = buildOptionalServices(Array.from(advUuidsSet).join(',')).filter(
+        (v, i, a) => a.indexOf(v) === i);
       d = await navigator.bluetooth.requestDevice(opts);
     }
     await afterGattConnect(d);
@@ -321,6 +363,7 @@ async function reconnectDevice() {
     const opts = {};
     if (name) { opts.acceptAllDevices = false; opts.filters = [{ namePrefix: name }]; }
     else opts.acceptAllDevices = true;
+    opts.optionalServices = buildOptionalServices($('fService').value.trim());
     const dev = await navigator.bluetooth.requestDevice(opts);
     device = dev;
     connectedName = dev.name || '(未命名)';
@@ -438,6 +481,9 @@ async function discoverServices() {
   } catch (err) {
     tree.innerHTML = `<div class="placeholder err">读取服务失败：${esc(err.message)}</div>`;
     appendLog('err', '读取 GATT 服务失败：' + err.message);
+    if (/not allowed to access/i.test(err.message)) {
+      appendLog('sys', '提示：请在「服务 UUID 过滤」填入设备的主服务 UUID 后重新搜索连接；或用「极简列表」模式（会自动从广播包带上服务授权）。');
+    }
     return 0;
   }
 }
