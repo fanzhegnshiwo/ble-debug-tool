@@ -109,10 +109,20 @@ function normUuid(u) {
   if (!t) return '';
   try { return BluetoothUUID.canonicalUUID(t); } catch { return t; }
 }
-function canonicFilter(u) {
-  const t = String(u || '').trim();
+// 把任意格式的服务 UUID 规范为完整小写 UUID：
+// '180f' / '0x180F' / '0000180f' / '0000180f-0000-1000-8000-00805f9b34fb' 都
+// 转成 '0000180f-0000-1000-8000-00805f9b34fb'；无法识别返回 ''。
+function normalizeServiceUuid(u) {
+  let t = String(u || '').trim().toLowerCase();
   if (!t) return '';
-  try { return BluetoothUUID.canonicalUUID(t); } catch { return null; }
+  t = t.replace(/^0x/, '');
+  if (/^[0-9a-f]{4}$/.test(t)) return '0000' + t + '-0000-1000-8000-00805f9b34fb';
+  if (/^[0-9a-f]{8}$/.test(t)) return t + '-0000-1000-8000-00805f9b34fb';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(t)) return t;
+  return '';
+}
+function canonicFilter(u) {
+  return normalizeServiceUuid(u);
 }
 
 /* ============================================================
@@ -145,12 +155,17 @@ const COMMON_SERVICES = [
   '49535343-fe7d-4ae5-8fa9-9fafd205e455',
 ];
 // 连接时组装 optionalServices：常用表 + 用户填写的服务
+// 关键：requestDevice 的 optionalServices 必须是「完整 UUID」（如
+// 00001800-0000-1000-8000-00805f9b34fb），不能用 '1800' 这种短别名，
+// 否则浏览器抛 "Invalid Service name: '1800'"，搜索直接失败。
 function buildOptionalServices(userSvc) {
-  const list = COMMON_SERVICES.slice();
-  if (userSvc) {
-    const c = canonicFilter(userSvc);
+  const list = [];
+  const add = (raw) => {
+    const c = canonicFilter(raw);
     if (c && !list.includes(c)) list.push(c);
-  }
+  };
+  COMMON_SERVICES.forEach(add);
+  if (userSvc) String(userSvc).split(/[\s,;]+/).filter(Boolean).forEach(add);
   return list;
 }
 
